@@ -159,7 +159,7 @@ void usage(char **argv) {
 	);
 }
 
-int sig_handler(int sig) {
+void sig_handler(int sig) {
 	die = 1;
 }
 
