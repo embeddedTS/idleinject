@@ -204,8 +204,8 @@ int main(int argc, char **argv) {
 	if(opt_led) {
 		led = fopen(opt_led, "r+");
 		if(led == NULL) {
-			perror("Couldn't open LED");
-			return 1;
+			perror("Couldn't open LED, continuing without LED support");
+			opt_led = 0;
 		}
 	}
 
