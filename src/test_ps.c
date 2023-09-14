@@ -14,55 +14,42 @@
 // Compile with -lprocps or -lproc2 | this needs the local flavor of the 
 //  procps-ng package
 
-enum pids_item items[] = { PIDS_ID_PID, PIDS_ID_PID };
-enum pids_item items2[] = { PIDS_ID_PID, PIDS_VM_RSS };
+#define TRUE 1
+#define FALSE 0
 
-int check_fatal_proc_unmounted(void *data);
-struct pids_info *info = NULL;
-struct pids_counts numPids;
-struct pids_stack *stack;
+int main() {
+    struct pids_info *info;
+    struct pids_fetch *fetch;
 
-int mytest(void *data){
-	int err = 0;
-	char *pointer;
-	int outval = 0;
-	long maxpids = 0;
-	char exe[30] = "";
-	int fp = open("/proc/sys/kernel/pid_max", O_RDONLY);
-	char buf[30];
-	enum pids_fetch_type which = PIDS_FETCH_TASKS_ONLY;
-	err = read(fp, buf, sizeof(buf));
-	maxpids = strtol(buf, &pointer, 0);
-	printf("Maximum pids is %ld.\n", maxpids);
+    // Initialize the pids_info structure.
+    enum pids_item items[] = {PIDS_EXE}; // Specify the information item you want.
+    int numItems = sizeof(items) / sizeof(enum pids_item);
 
-	struct pids_stack *stack =NULL;
-	stack = fatal_proc_unmounted(info, 1);
-	outval = procps_pids_new(&info, items, maxpids);
-//	outval = procps_pids_reap(&info, PIDS_FETCH_TASKS_ONLY);
-	stack = procps_pids_get(info, which);
-	exe = stack->head->item[PIDS_EXE];
+    if (procps_pids_new(&info, items, numItems) != 0) {
+        fprintf(stderr, "Failed to initialize pids_info.\n");
+        return 1;
+    }
 
-	return 0;	
-}
+    // Fetch the list of executables.
+    fetch = procps_pids_reap(info, PIDS_FETCH_TASKS_ONLY);
 
-int main(void)
-{
-	int outval = 0;
-	void *data = NULL;
-	outval = check_fatal_proc_unmounted(data);
-	printf("returned %d.\n", outval);
-	mytest(NULL);
-	return outval;
-}
+    if (!fetch) {
+        fprintf(stderr, "Failed to fetch executables.\n");
+        procps_pids_unref(&info);
+        return 1;
+    }
 
-int check_fatal_proc_unmounted(void *data)
-{
-    struct pids_info *info = NULL;
-    struct pids_stack *stack;
-    printf("check_fatal_proc_unmounted\n");
+    // Iterate through the results and print the executables.
+    int i;
+    for (i = 0; i < fetch->counts->total; i++) {
+        struct pids_result *result = &fetch->stacks[i]->head[0];
+        if (result->item == PIDS_EXE && result->result.str) {
+            printf("Executable: %s\n", result->result.str);
+        }
+    }
 
-    return ( (procps_pids_new(&info, items2, 2) == 0) &&
-	    ( (stack = fatal_proc_unmounted(info, 1)) != NULL) &&
-	    ( PIDS_VAL(0, s_int, stack, info) > 0) &&
-	    ( PIDS_VAL(1, u_int, stack, info) > 0));
+    // Clean up.
+    procps_pids_unref(&info);
+
+    return 0;
 }
