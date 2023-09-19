@@ -107,7 +107,7 @@ int getParentPid(pid_t pid) {
 			if(strstr(line, "PPid:")) {
 				lpid = strtol(line, &error, 10);  // takes ppid number, if any, strips "PPid:"
 				ppid = (int)lpid;
-				break;
+				break; // we're done here.
 			}
 		}
 	}
@@ -223,7 +223,7 @@ static void recurse(pid_t pid) {
 		kill_list[nkills++] = pid;
 }
 
-void idleinject() {
+void idle_inject() {
 	struct sched_param sched;
 	if (kill_list != NULL) {
         return;
@@ -265,6 +265,28 @@ void idleinject() {
 		ptrace(PTRACE_SEIZE, kill_list[i], 0, 0);
 		ptrace(PTRACE_INTERRUPT, kill_list[i], 0, 0);
 	}
+}
+
+static void idle_cancel(void) {
+	int i;
+	struct sched_param sched;
+
+	if (kill_list == NULL) return;
+
+	for (i = 0; i < nkills; i++) {
+		ptrace(PTRACE_DETACH, kill_list[i], 0, 0);
+	}
+
+	sched.sched_priority = 0;
+	sched_setscheduler(0, SCHED_OTHER, &sched);
+	free(kill_list);
+	for (i = 0; i < nprocs; i++) 
+		if (procs[i].children) free(procs[i].children);
+	free(procs);
+	procs = NULL;
+	kill_list = NULL;
+	nprocs = 0;
+	nkills = 0;
 }
 
 static int millicelsius(void) {
