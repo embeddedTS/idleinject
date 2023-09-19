@@ -47,7 +47,7 @@ static pid_t *kill_list = NULL;
 static int nkills = 0;
 
 //---------------------------FUNCTIONS---------------------
-int isProcessSpecial(pid_t pid) {
+int is_process_special(pid_t pid) {
     char cmdlinePath[256];
 
     snprintf(cmdlinePath, sizeof(cmdlinePath), "/proc/%d/cmdline", pid);
@@ -67,7 +67,7 @@ int isProcessSpecial(pid_t pid) {
 }
 
 // Function to check if a process is approprite to pause.
-int isProcessStopped(pid_t pid) {
+int is_process_stopped(pid_t pid) {
     char statusPath[256];    
 
     snprintf(statusPath, sizeof(statusPath), "/proc/%d/status", pid);
@@ -86,15 +86,7 @@ int isProcessStopped(pid_t pid) {
     return 0; // Process is not stopped or special
 }
 
-// Function to pause a process using ptrace
-void pauseProcess(pid_t pid) {
-    if (!isProcessSpecial(pid)) {
-        ptrace(PTRACE_ATTACH, pid, 0, 0);
-        waitpid(pid, NULL, 0);
-    }
-}
-
-int getParentPid(pid_t pid) {
+int get_parent_pid(pid_t pid) {
 	int ppid = 0;
 	long lpid = 0;
 	char *error;
@@ -113,69 +105,6 @@ int getParentPid(pid_t pid) {
 	}
 	fclose(statusFile);
 	return ppid;
-}
-
-// Function to resume a paused process using ptrace
-void resumeProcess(pid_t pid) {
-    if (isProcessSpecial(pid)) {
-        ptrace(PTRACE_DETACH, pid, 0, 0);
-    }
-}
-
-// Function to recursively pause processes
-void recurseAndPause(pid_t pid) {
-    DIR *dir;
-    struct dirent *entry;
-
-    char taskPath[256];
-    snprintf(taskPath, sizeof(taskPath), "/proc/%d/task", pid);
-
-    dir = opendir(taskPath);
-    if (dir == NULL) {
-        return;
-    }
-
-    while ((entry = readdir(dir))) {
-        if (entry->d_name[0] == '.') {
-            continue; // Skip entries starting with '.'
-        }
-
-        pid_t tid = atoi(entry->d_name);
-        if (tid != pid) {
-            pauseProcess(tid); // Pause the process
-            recurseAndPause(tid); // Recursively pause its children
-        }
-    }
-
-    closedir(dir);
-}
-
-// Function to recursively resume processes
-void recurseAndResume(pid_t pid) {
-    DIR *dir;
-    struct dirent *entry;
-
-    char taskPath[256];
-    snprintf(taskPath, sizeof(taskPath), "/proc/%d/task", pid);
-
-    dir = opendir(taskPath);
-    if (dir == NULL) {
-        return;
-    }
-
-    while ((entry = readdir(dir))) {
-        if (entry->d_name[0] == '.') {
-            continue; // Skip entries starting with '.'
-        }
-
-        pid_t tid = atoi(entry->d_name);
-        if (tid != pid) {
-            resumeProcess(tid); // Resume the process
-            recurseAndResume(tid); // Recursively resume its children
-        }
-    }
-
-    closedir(dir);
 }
 
 static void insert_proc(pid_t pid, pid_t ppid, int flags) {
@@ -245,13 +174,13 @@ void idle_inject() {
 		pid_t ppid;
 		if (pid > 0 && pid != self) {
 			int flags = 0;
-			if (isProcessStopped(pid)) {
+			if (is_process_stopped(pid)) {
 			    flags = PROC_ALREADY_STOPPED;
 			}
-			if (isProcessSpecial(pid)) {
+			if (is_process_special(pid)) {
 				flags = PROC_SPECIAL;
 			}
-			ppid = getParentPid(pid);
+			ppid = get_parent_pid(pid);
 			insert_proc(pid, ppid, flags); // Insert the process into your data structure
 		}
 	}
