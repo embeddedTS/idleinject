@@ -97,7 +97,7 @@ int get_parent_pid(pid_t pid) {
 	if(statusFile) {
 		while (fgets(line, sizeof(line), statusFile)) {
 			if(strstr(line, "PPid:")) {
-				lpid = strtol(line, &error, 10);  // takes ppid number, if any, strips "PPid:"
+				lpid = strtol(line + (strlen("PPid:")), &error, 10);
 				ppid = (int)lpid;
 				break; // we're done here.
 			}
