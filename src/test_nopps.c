@@ -11,9 +11,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdlib.h>
 #include <getopt.h>
-#include <assert.h>
 #include <malloc.h>
 #include <string.h>
 #include <unistd.h>
@@ -21,7 +19,6 @@
 #include <dirent.h>
 #include <signal.h>
 #include <sched.h>
-#include <assert.h>
 #include <fcntl.h>
 #include <sys/ptrace.h>
 #include <sys/wait.h>
@@ -133,23 +130,6 @@ static void insert_proc(pid_t pid, pid_t ppid, int flags) {
 	}
 	procs[i].flags = flags;
 	procs[i].ppid = ppid;
-}
-
-static void recurse(pid_t pid) {
-	int i, j;
-
-	for (i = 0; i < nprocs; i++) 
-		if (procs[i].pid == pid) 
-			break; 
-	if (i == nprocs) 
-		return; /* not found */
-
-	for (j = 0; j < procs[i].nchildren; j++) 
-		if (!(procs[i].flags & PROC_SPECIAL))
-			recurse(procs[i].children[j]);
-
-	if (!procs[i].flags & PROC_ALREADY_STOPPED) 
-		kill_list[nkills++] = pid;
 }
 
 void idle_inject() {
