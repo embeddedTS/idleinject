@@ -45,12 +45,12 @@ static int nkills = 0;
 
 //---------------------------FUNCTIONS---------------------
 int is_process_special(pid_t pid) {
-    char cmdlinePath[256];
+	char cmdlinePath[256];
 
-    snprintf(cmdlinePath, sizeof(cmdlinePath), "/proc/%d/cmdline", pid);
+	snprintf(cmdlinePath, sizeof(cmdlinePath), "/proc/%d/cmdline", pid);
 
-    FILE *cmdlineFile = fopen(cmdlinePath, "r");
-    if(cmdlineFile){
+	FILE *cmdlineFile = fopen(cmdlinePath, "r");
+	if(cmdlineFile){
 	char line[2];
 	while(fgets(line,sizeof(line),cmdlineFile)) {
 		if(strstr(line, "@")){
@@ -59,28 +59,28 @@ int is_process_special(pid_t pid) {
 		}
 	}
 	fclose(cmdlineFile);
-    }
-    return 0; // Process is not special.
+	}
+	return 0; // Process is not special.
 }
 
 // Function to check if a process is approprite to pause.
 int is_process_stopped(pid_t pid) {
-    char statusPath[256];    
+	char statusPath[256];  
+	char line[256];  
 
-    snprintf(statusPath, sizeof(statusPath), "/proc/%d/status", pid);
+	snprintf(statusPath, sizeof(statusPath), "/proc/%d/status", pid);
 
-    FILE *statusFile = fopen(statusPath, "r");
-    if (statusFile) {
-        char line[256];
-        while (fgets(line, sizeof(line), statusFile)) {
-            if (strstr(line, "State:") && strstr(line, "T")) {
-                fclose(statusFile);
-                return 1; // Process is already stopped
-            }
-        }
-        fclose(statusFile);
-    }
-    return 0; // Process is not stopped or special
+	FILE *statusFile = fopen(statusPath, "r");
+	if (statusFile) {
+		while (fgets(line, sizeof(line), statusFile)) {
+			if (strstr(line, "State:") && strstr(line, "T")) {
+				fclose(statusFile);
+				return 1; // Process is already stopped
+			}
+		}
+		fclose(statusFile);
+	}
+	return 0; // Process is not stopped or special
 }
 
 int get_parent_pid(pid_t pid) {
@@ -109,7 +109,8 @@ static void insert_proc(pid_t pid, pid_t ppid, int flags) {
 
 	/* Check if parent already inserted ... */
 	if (flags != PROC_ROOT) {
-		for (i = 0; i < nprocs; i++) if (procs[i].pid == ppid) break;
+		for (i = 0; i < nprocs; i++) 
+			if (procs[i].pid == ppid) break;
 		if (i == nprocs) 
 			insert_proc(ppid, 0, PROC_ROOT);
 		procs[i].children = realloc(procs[i].children, 
@@ -132,11 +133,26 @@ static void insert_proc(pid_t pid, pid_t ppid, int flags) {
 	procs[i].ppid = ppid;
 }
 
+static void recurse(pid_t pid) {
+	int i, j;
+
+	for (i = 0; i < nprocs; i++) 
+		if (procs[i].pid == pid) break; 
+	if (i == nprocs) return; /* not found */
+
+	for (j = 0; j < procs[i].nchildren; j++) 
+		if (!(procs[i].flags & PROC_SPECIAL))
+			recurse(procs[i].children[j]);
+
+	if (!procs[i].flags & PROC_ALREADY_STOPPED) 
+		kill_list[nkills++] = pid;
+}
+
 void idle_inject() {
 	struct sched_param sched;
 	if (kill_list != NULL) {
-        return;
-    }
+		return;
+	}
 	sched.sched_priority = 99;
 	sched_setscheduler(0, SCHED_FIFO, &sched);
 	pid_t self = getpid();
@@ -155,7 +171,7 @@ void idle_inject() {
 		if (pid > 0 && pid != self) {
 			int flags = 0;
 			if (is_process_stopped(pid)) {
-			    flags = PROC_ALREADY_STOPPED;
+				flags = PROC_ALREADY_STOPPED;
 			}
 			if (is_process_special(pid)) {
 				flags = PROC_SPECIAL;
@@ -168,6 +184,8 @@ void idle_inject() {
 	// Allocate and fill the kill_list if needed
 	kill_list = malloc(sizeof(pid_t) * nprocs);
 	nkills = 0;
+	for (i = 0; i < nprocs; i++) 
+		if (procs[i].flags & PROC_ROOT) recurse(procs[i].pid);
 	for (i = (nkills - 1); i >= 0; i--) {
 	// sending SIGSTOP had side-effect of sending SIGCHLD 
 	// to parent process randomly, use ptrace instead
@@ -214,11 +232,11 @@ void usage(char **argv) {
 		"Usage: %s [OPTIONS] ...\n"
 		"embeddedTS Userspace Idle Injector\n"
 		"\n"
-		"  -l, --led      Specify LED brightness file to toggle, eg:\n"
-		"                 --led /sys/class/leds/right-red-led/brightness\n"
+		"  -l, --led	  Specify LED brightness file to toggle, eg:\n"
+		"				 --led /sys/class/leds/right-red-led/brightness\n"
 		"  -t, --maxtemp  Set the max temperature in millicelcius before idle\n"
-		"                 injector starts, or 115000 default.\n"
-		"  -h, --help     This message\n"
+		"				 injector starts, or 115000 default.\n"
+		"  -h, --help	 This message\n"
 		"  This utility polls the CPU temperature and pauses userspace\n"
 		"  applications until the temperature is reduced.  If specified,\n"
 		"  this will turn on the LED when it is injecting idle.\n"
