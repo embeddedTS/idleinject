@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <string.h>
 
 int main() {
 	pid_t pid, self;
@@ -31,15 +32,15 @@ int main() {
 		pid_t ppid;
 
 		printf("Process %s:  ", procEntry->d_name);
-		if(pid > 0)
-			snprintf(cmdlinePath, sizeof(cmdlinePath), "/proc/%d/cmdlline", pid);
-		cmdlineFile = fopen(cmdlinePath, "r");
-
-		if(!cmdlineFile)
-			printf("No cmdline?");
-		else
-			printf("%s/n",fgets(line, sizeof(line), cmdlineFile));
-		fclose(cmdlineFile);
+		if(pid > 0 && !strstr(procEntry->d_name, ".")){
+			snprintf(cmdlinePath, sizeof(cmdlinePath), "/proc/%d/cmdline", pid);
+			cmdlineFile = fopen(cmdlinePath, "r");
+			if(!cmdlineFile)
+				printf("No cmdline?");
+			else
+				printf("%s/n",fgets(line, sizeof(line), cmdlineFile));
+			fclose(cmdlineFile);
+		}
 		printf("\n");	
 	}
 	closedir(procDir);
