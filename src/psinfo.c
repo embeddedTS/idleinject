@@ -8,12 +8,15 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 
 int main() {
 	pid_t pid, self;
 	char cmdlinePath[256];
 	char statusPath[256];
 	char line[256];
+	long lpid = 0;
+	char *error;
 
 	DIR *procDir;
 	struct dirent *procEntry;
@@ -55,9 +58,14 @@ int main() {
 				printf("No status file?");
 			else {
 				while(fgets(line, sizeof(line), statusFile)) {
-					if(strstr(line, "State: ")){
+					if(strstr(line, "State:")){
 						printf("%s", line);
-						break;
+					}
+					if(strstr(line, "PPid:")) {
+						lpid = strtol(line + (strlen("PPid:")), &error, 10);
+						ppid = (int)lpid;
+						printf("%s, %d", line, ppid);
+						break; // we're done here.
 					}
 				}
 				fclose(statusFile);
