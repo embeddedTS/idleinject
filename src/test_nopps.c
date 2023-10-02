@@ -44,6 +44,10 @@ static pid_t *kill_list = NULL;
 static int nkills = 0;
 
 //---------------------------FUNCTIONS---------------------
+
+// Takes a pid_t process ID and finds out if the process cmd line
+//  Starts with an @ symbol (indicating it should not be paused).
+//  Returns 0 if process not special, 1 if special.
 int is_process_special(pid_t pid) {
 	char cmdlinePath[256];
 
@@ -53,7 +57,7 @@ int is_process_special(pid_t pid) {
 	if(cmdlineFile){
 	char line[2];
 	while(fgets(line,sizeof(line),cmdlineFile)) {
-		if(strstr(line, "@")){
+		if(strstr(line, "@")){  // There is only one line in cmdline file
 			fclose(cmdlineFile);
 			return 1; // Special Process identified.
 		}
@@ -63,7 +67,8 @@ int is_process_special(pid_t pid) {
 	return 0; // Process is not special.
 }
 
-// Function to check if a process is approprite to pause.
+// Function to check if a process is already paused.
+//  Looks for state "T" in /proc/<pid>/status file.
 int is_process_stopped(pid_t pid) {
 	char statusPath[256];  
 	char line[256];  
@@ -191,6 +196,7 @@ void idle_inject() {
 	// to parent process randomly, use ptrace instead
 		ptrace(PTRACE_SEIZE, kill_list[i], 0, 0);
 		ptrace(PTRACE_INTERRUPT, kill_list[i], 0, 0);
+		printf("%d paused.\n", kill_list[i]);
 	}
 }
 
