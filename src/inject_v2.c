@@ -117,7 +117,7 @@ int pid_stopped(pid_t pid){
 	statusFile = fopen(statusPath, "r");
 
 	if(!statusFile)
-		printf("No status file?");
+		return isStopped;  // Maybe return some kind of error, or assert() maybe?
 	else {
 		while(fgets(line, sizeof(line), statusFile)) {
 			if(strstr(line, "State:") && (strstr(line, "t") || (strstr(line, "T")))) {
@@ -144,13 +144,13 @@ int pid_special(pid_t pid, pid_t self){
 	cmdLineFile = fopen(cmdLinePath, "r");
 
 	if(!cmdLineFile){
-		return_value = 1;
-		return return_value;
+		return 1;
 	}
-	if(strstr(line, "@"))
+	else if(strstr(line, "@")) {
 		return_value = 1;
-	if(cmdLineFile)
-		fclose(cmdLineFile);
+	}
+
+	fclose(cmdLineFile);
 	return return_value;
 }
 
@@ -186,7 +186,6 @@ static void idle_inject(void) {
 				flags = PROC_ALREADY_STOPPED;
 			if(pid_special(pid, self))
 				flags |= PROC_SPECIAL;
-			insert_proc(pid, ppid, flags);
 		}
 		insert_proc(pid, ppid, flags);
 	}
