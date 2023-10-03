@@ -120,7 +120,7 @@ int pid_stopped(pid_t pid){
 		printf("No status file?");
 	else {
 		while(fgets(line, sizeof(line), statusFile)) {
-			if(strstr(line, "State:") && strstr(line, "T")) {
+			if(strstr(line, "State:") && (strstr(line, "t") || (strstr(line, "T")))) {
 				isStopped = 1;
 				break; // we're done here.
 			}
@@ -131,21 +131,26 @@ int pid_stopped(pid_t pid){
 }
 
 // Returns 1 if the pid should not be paused.
-int pid_special(pid_t pid){
+int pid_special(pid_t pid, pid_t self){
 	int return_value = 0;
 	char cmdLinePath[256];
 	char line[256] = {'\0'};
-	FILE *cmdLineFile;
+	FILE *cmdLineFile = NULL;
+
+	if(pid == self)
+		return 1;
 
 	snprintf(cmdLinePath, sizeof(cmdLinePath), "/proc/%d/cmdline", pid);
 	cmdLineFile = fopen(cmdLinePath, "r");
 
-	if(!cmdLineFile)
+	if(!cmdLineFile){
 		return_value = 1;
+		return return_value;
+	}
 	if(strstr(line, "@"))
 		return_value = 1;
-
-	fclose(cmdLineFile);
+	if(cmdLineFile)
+		fclose(cmdLineFile);
 	return return_value;
 }
 
@@ -179,13 +184,14 @@ static void idle_inject(void) {
 			ppid = get_ppid(pid);
 			if(pid_stopped(pid))
 				flags = PROC_ALREADY_STOPPED;
-			if(pid_special(pid) || pid == self)
+			if(pid_special(pid, self))
 				flags |= PROC_SPECIAL;
 			insert_proc(pid, ppid, flags);
 		}
 		insert_proc(pid, ppid, flags);
 	}
 	closedir(procDir);
+
 	kill_list = malloc(sizeof(pid_t) * nprocs);
 	nkills = 0;
 	for (i = 0; i < nprocs; i++) 
