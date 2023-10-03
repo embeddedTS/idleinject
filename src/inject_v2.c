@@ -131,14 +131,11 @@ int pid_stopped(pid_t pid){
 }
 
 // Returns 1 if the pid should not be paused.
-int pid_special(pid_t pid, pid_t self){
+int pid_special(pid_t pid){
 	int return_value = 0;
 	char cmdLinePath[256];
 	char line[256] = {'\0'};
 	FILE *cmdLineFile = NULL;
-
-	if(pid == self)
-		return 1;
 
 	snprintf(cmdLinePath, sizeof(cmdLinePath), "/proc/%d/cmdline", pid);
 	cmdLineFile = fopen(cmdLinePath, "r");
@@ -184,9 +181,9 @@ static void idle_inject(void) {
 			ppid = get_ppid(pid);
 			if(pid_stopped(pid))
 				flags = PROC_ALREADY_STOPPED;
-			if(pid_special(pid, self))
-				flags |= PROC_SPECIAL;
-		}
+			if(pid_special(pid) || (pid==self))
+				flags |= PROC_SPECIAL;	
+		}		
 		insert_proc(pid, ppid, flags);
 	}
 	closedir(procDir);
