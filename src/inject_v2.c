@@ -44,10 +44,12 @@ static void insert_proc(pid_t pid, pid_t ppid, int flags) {
 
 	/* Check if parent already inserted ... */
 	if (flags != PROC_ROOT) {
-		for (i = 0; i < nprocs; i++) if (procs[i].pid == ppid) break;
-		if (i == nprocs) insert_proc(ppid, 0, PROC_ROOT);
+		for (i = 0; i < nprocs; i++) 
+			if (procs[i].pid == ppid) break;
+		if (i == nprocs)
+			insert_proc(ppid, 0, PROC_ROOT);
 		procs[i].children = realloc(procs[i].children, 
-		  sizeof(pid_t) * (procs[i].nchildren + 1));
+			sizeof(pid_t) * (procs[i].nchildren + 1));
 		procs[i].children[procs[i].nchildren++] = pid;
 	}
 
@@ -92,7 +94,7 @@ pid_t get_ppid(pid_t pid){
 	statusFile = fopen(statusPath, "r");
 
 	if(!statusFile)
-		printf("No status file?");
+		return 0;  // No status file?  Should never happen to a valid pid!
 	else {
 		while(fgets(line, sizeof(line), statusFile)) {
 			if(strstr(line, "PPid:")) {
@@ -190,6 +192,9 @@ static void idle_inject(void) {
 
 	kill_list = malloc(sizeof(pid_t) * nprocs);
 	nkills = 0;
+
+	if(kill_list == NULL)
+		perror("Failed to allocate memory for kill list.\n");
 	for (i = 0; i < nprocs; i++) 
 		if (procs[i].flags & PROC_ROOT) recurse(procs[i].pid);
 	for (i = (nkills - 1); i >= 0; i--) {
@@ -212,10 +217,10 @@ static void idle_cancel(void) {
 
 	sched.sched_priority = 0;
 	sched_setscheduler(0, SCHED_OTHER, &sched);
-	free(kill_list);
 	for (i = 0; i < nprocs; i++) 
 		if (procs[i].children) free(procs[i].children);
 	free(procs);
+	free(kill_list);
 	procs = NULL;
 	kill_list = NULL;
 	nprocs = 0;
@@ -262,6 +267,9 @@ int main(int argc, char **argv) {
 	FILE *led = NULL;
 	char *opt_led = 0;
 	int opt_temp = MAXTEMP;
+
+	die = 0;
+	nprocs = 0;
 
 	static struct option long_options[] = {
 		{ "led", required_argument, 0, 'l' },
