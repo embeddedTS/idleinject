@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <sys/ptrace.h>
+#include <regex.h>
 
 /* Compile this with option -lprocps.  It needs libprocps-dev package.
  * Don't forget the -DMAXTEMP=XXX */
@@ -82,76 +83,94 @@ static void recurse(pid_t pid) {
 }
 
 // Gets parent pid# if there is one, otherwise returns zero.
-pid_t get_ppid(pid_t pid){
-	pid_t ppid = 0;
-	long lpid = 0;
-	char *error;
-	char statusPath[256];
-	char line[256] = {'\0'};
-	FILE *statusFile;
+pid_t get_ppid(pid_t pid) {
+  pid_t ppid = -1;
+  char buf[1024];
+  FILE *fp;
+  regex_t regex;
 
-	snprintf(statusPath, sizeof(statusPath), "/proc/%d/status", pid);
-	statusFile = fopen(statusPath, "r");
+  regcomp(&regex, "^\\s*PPid:\\s+(\\d+)$", REG_EXTENDED);
 
-	if(!statusFile)
-		return 0;  // No status file?  Should never happen to a valid pid!
-	else {
-		while(fgets(line, sizeof(line), statusFile)) {
-			if(strstr(line, "PPid:")) {
-			lpid = strtol(line + (strlen("PPid:")), &error, 10);
-			ppid = (int)lpid;
-			break; // we're done here.
-			}
-		}
-		fclose(statusFile);
-	}
-	return ppid;
+  sprintf(buf, "/proc/%d/status", pid);
+  fp = fopen(buf, "r");
+  if (fp == NULL) {
+    return ppid;
+  }
+
+  while (fgets(buf, sizeof(buf), fp) != NULL) {
+    if (regexec(&regex, buf, 0, NULL, 0) == 0) {
+      ppid = strtol(buf + 7, NULL, 10);
+      break;
+    }
+  }
+
+  regfree(&regex);
+  fclose(fp);
+
+  return ppid;
 }
 
+
 // Read process state, return 1 if "T", else return 0.
-int pid_stopped(pid_t pid){
-	int isStopped = 0;
-	char statusPath[256];
-	char line[256] = {'\0'};
-	FILE *statusFile;
+int pid_stopped(pid_t pid) {
+  int isStopped = 0;
+  char statusPath[256];
+  char line[256] = {'\0'};
+  FILE *statusFile;
+  regex_t regex;
 
-	snprintf(statusPath, sizeof(statusPath), "/proc/%d/status", pid);
-	statusFile = fopen(statusPath, "r");
+  regcomp(&regex, "^\\s*State:\\s+(t|T|stopped)$", REG_ICASE);
 
-	if(!statusFile)
-		return isStopped;  // Maybe return some kind of error, or assert() maybe?
-	else {
-		while(fgets(line, sizeof(line), statusFile)) {
-			if(strstr(line, "State:") && (strstr(line, "t") || (strstr(line, "T")))) {
-				isStopped = 1;
-				break; // we're done here.
-			}
-		}
-		fclose(statusFile);
-	}
-	return isStopped;
+  snprintf(statusPath, sizeof(statusPath), "/proc/%d/status", pid);
+  statusFile = fopen(statusPath, "r");
+
+  if (!statusFile) {
+    return isStopped;
+  }
+
+  while (fgets(line, sizeof(line), statusFile)) {
+    if (regexec(&regex, line, 0, NULL, 0) == 0) {
+      isStopped = 1;
+      break;
+    }
+  }
+
+  regfree(&regex);
+  fclose(statusFile);
+
+  return isStopped;
 }
 
 // Returns 1 if the pid should not be paused.
-int pid_special(pid_t pid){
-	int return_value = 0;
-	char cmdLinePath[256];
-	char line[256] = {'\0'};
-	FILE *cmdLineFile = NULL;
+int pid_special(pid_t pid) {
+  int return_value = 0;
+  char cmdLinePath[256];
+  char line[256] = {'\0'};
+  FILE *cmdLineFile = NULL;
+  regex_t regex;
 
-	snprintf(cmdLinePath, sizeof(cmdLinePath), "/proc/%d/cmdline", pid);
-	cmdLineFile = fopen(cmdLinePath, "r");
+  regcomp(&regex, "@", REG_EXTENDED);
 
-	if(!cmdLineFile){
-		return 1;
-	}
-	else if(strstr(line, "@")) {
-		return_value = 1;
-	}
+  snprintf(cmdLinePath, sizeof(cmdLinePath), "/proc/%d/cmdline", pid);
+  cmdLineFile = fopen(cmdLinePath, "r");
 
-	fclose(cmdLineFile);
-	return return_value;
+  if (!cmdLineFile) {
+    return 1;
+  }
+
+  while (fgets(line, sizeof(line), cmdLineFile)) {
+    if (regexec(&regex, line, 0, NULL, 0) == 0) {
+      return_value = 1;
+      break;
+    }
+  }
+
+  regfree(&regex);
+  fclose(cmdLineFile);
+
+  return return_value;
 }
+
 
 // Places all nonessential processes in 'T' status.
 //  Takes no args, and returns nothing.
