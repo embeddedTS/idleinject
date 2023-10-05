@@ -39,6 +39,8 @@ static struct {
   int nchildren;
   int flags;
 } *procs;
+static pid_t *kill_list = NULL;
+static int nkills = 0;
 
 static void insert_proc(pid_t pid, pid_t ppid, int flags) {
 	int i;
@@ -69,8 +71,6 @@ static void insert_proc(pid_t pid, pid_t ppid, int flags) {
 	procs[i].ppid = ppid;
 }
 
-static pid_t *kill_list = NULL;
-static int nkills = 0;
 static void recurse(pid_t pid) {
 	int i, j;
 
@@ -86,91 +86,100 @@ static void recurse(pid_t pid) {
 
 // Gets parent pid# if there is one, otherwise returns zero.
 pid_t get_ppid(pid_t pid) {
-  pid_t ppid = -1;
-  char buf[1024];
-  FILE *fp;
-  regex_t regex;
+	pid_t ppid = -1;
+	char buf[1024];
+	FILE *fp;
+	regex_t regex;
 
-  regcomp(&regex, "^\\s*PPid:\\s+(\\d+)$", REG_EXTENDED);
+	regcomp(&regex, "^\\s*PPid:\\s+(\\d+)$", REG_EXTENDED);
 
-  sprintf(buf, "/proc/%d/status", pid);
-  fp = fopen(buf, "r");
-  if (fp == NULL) {
-    return ppid;
-  }
+	sprintf(buf, "/proc/%d/status", pid);
+	fp = fopen(buf, "r");
+	if (fp == NULL) {
+		return ppid;
+	}
 
-  while (fgets(buf, sizeof(buf), fp) != NULL) {
-    if (regexec(&regex, buf, 0, NULL, 0) == 0) {
-      ppid = strtol(buf + 7, NULL, 10);
-      break;
-    }
-  }
+	while (fgets(buf, sizeof(buf), fp) != NULL) {
+		if (buf[strlen(buf) - 1] != '\n') {
+			continue;
+		}
+		else if (regexec(&regex, buf, 0, NULL, 0) == 0) {
+			ppid = strtol(buf + 7, NULL, 10);
+			break;
+		}
+	}
 
-  regfree(&regex);
-  fclose(fp);
+	regfree(&regex);
+	fclose(fp);
 
-  return ppid;
+	return ppid;
 }
 
 
 // Read process state, return 1 if "T", else return 0.
 int pid_stopped(pid_t pid) {
-  int isStopped = 0;
-  char statusPath[256];
-  char line[256] = {'\0'};
-  FILE *statusFile;
-  regex_t regex;
+	int isStopped = 0;
+	char statusPath[256];
+	char line[256] = {'\0'};
+	FILE *statusFile;
+	regex_t regex;
 
-  regcomp(&regex, "^\\s*State:\\s+(t|T|stopped)$", REG_ICASE);
+	regcomp(&regex, "^\\s*State:\\s+(t|T|stopped)$", REG_ICASE);
 
-  snprintf(statusPath, sizeof(statusPath), "/proc/%d/status", pid);
-  statusFile = fopen(statusPath, "r");
+	snprintf(statusPath, sizeof(statusPath), "/proc/%d/status", pid);
+	statusFile = fopen(statusPath, "r");
 
-  if (!statusFile) {
-    return isStopped;
-  }
+	if (!statusFile) { // if no status file, don't mess with the proc.
+	  return 1;
+	}
 
-  while (fgets(line, sizeof(line), statusFile)) {
-    if (regexec(&regex, line, 0, NULL, 0) == 0) {
-      isStopped = 1;
-      break;
-    }
-  }
+	while (fgets(line, sizeof(line), statusFile)) {
+			if (line[strlen(line) - 1] != '\n') {
+				continue;
+			}
+			if (regexec(&regex, line, 0, NULL, 0) == 0) {
+				isStopped = 1;
+				break;
+			}
+		}
 
-  regfree(&regex);
-  fclose(statusFile);
+	regfree(&regex);
+	fclose(statusFile);
 
-  return isStopped;
+	return isStopped;
 }
 
 // Returns 1 if the pid should not be paused.
 int pid_special(pid_t pid) {
-  int return_value = 0;
-  char cmdLinePath[256];
-  char line[256] = {'\0'};
-  FILE *cmdLineFile = NULL;
-  regex_t regex;
+	int return_value = 0;
+	char cmdLinePath[256];
+	char line[256] = {'\0'};
+	FILE *cmdLineFile = NULL;
+	regex_t regex;
 
-  regcomp(&regex, "@", REG_EXTENDED);
+	regcomp(&regex, "@", REG_EXTENDED);
 
-  snprintf(cmdLinePath, sizeof(cmdLinePath), "/proc/%d/cmdline", pid);
-  cmdLineFile = fopen(cmdLinePath, "r");
+	snprintf(cmdLinePath, sizeof(cmdLinePath), "/proc/%d/cmdline", pid);
+	cmdLineFile = fopen(cmdLinePath, "r");
 
-  if (!cmdLineFile) {
-    return 1;
-  }
+	if (!cmdLineFile) {
+		return 1;
+	}
 
-  while (fgets(line, sizeof(line), cmdLineFile)) {
-    if (regexec(&regex, line, 0, NULL, 0) == 0) {
-      return_value = 1;
-      break;
-    }
-  }
+	while (fgets(line, sizeof(line), cmdLineFile)) {
+		if (line[strlen(line) - 1] != '\n') {
+			continue;
+		}
+		if (regexec(&regex, line, 0, NULL, 0) == 0) {
+			return_value = 1;
+			break;
+		}
+	}
 
-  regfree(&regex);
-  fclose(cmdLineFile);
+	regfree(&regex);
+	fclose(cmdLineFile);
 
-  return return_value;
+	return return_value;
 }
 
 
