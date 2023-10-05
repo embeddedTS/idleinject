@@ -51,6 +51,8 @@ static void insert_proc(pid_t pid, pid_t ppid, int flags) {
 			insert_proc(ppid, 0, PROC_ROOT);
 		procs[i].children = realloc(procs[i].children, 
 			sizeof(pid_t) * (procs[i].nchildren + 1));
+		if(procs[i].children == NULL)
+			perror("Memory allocation failed for procs table.\n");
 		procs[i].children[procs[i].nchildren++] = pid;
 	}
 
