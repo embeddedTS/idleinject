@@ -193,7 +193,7 @@ typedef struct proc_t {
 #include <dirent.h>
 #include <unistd.h>
 
-#define PROCPATHLEN 64  // must hold /proc/2000222000/task/2000222000/cmdline
+#define PROCPATHLEN NAME_MAX+PATH_MAX  // must hold /proc/2000222000/task/2000222000/cmdline
 
 typedef struct PROCTAB {
     DIR*	procfs;
