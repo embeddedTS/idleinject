@@ -17,9 +17,17 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+/* Builds on the target resulted in this being defined as 600, so just keep
+ * it that way.
+ */
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 600
+#endif
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <string.h>
+#include <strings.h>
 #include <limits.h>
 #include "procps.h"
 #include "escape.h"
